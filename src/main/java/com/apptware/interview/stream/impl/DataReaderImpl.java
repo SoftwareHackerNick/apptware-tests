@@ -13,27 +13,38 @@ import org.springframework.stereotype.Service;
 @Service
 class DataReaderImpl implements DataReader {
 
-	@Autowired
-	private PaginationService paginationService;
-	private static int FULL_DATA_SIZE = 10000;
+    @Autowired
+    private PaginationService paginationService;
 
-	@Override
-	public Stream<String> fetchLimitadData(int limit) {
-		return fetchPaginatedDataAsStream().limit(limit);
-	}
+    private static final int PAGE_SIZE = 10000; 
 
-	@Override
-	public Stream<String> fetchFullData() {
-		return fetchPaginatedDataAsStream();
-	}
-	  //This method fetches paginated data as a stream.
-	private @Nonnull Stream<String> fetchPaginatedDataAsStream() {
-		log.info("Fetching paginated data as stream.");
+    @Override
+    public Stream<String> fetchLimitadData(int limit) {
+        return fetchPaginatedDataAsStream().limit(limit);
+    }
 
-		// Create a stream of data items based on FULL_DATA_SIZE
-		Stream<String> dataStream = Stream.iterate(1, n -> n + 1).limit(FULL_DATA_SIZE).map(n -> "Item" + n); 
-		// Replace with actual data fetching logic
+    @Override
+    public Stream<String> fetchFullData() {
+        return fetchPaginatedDataAsStream();
+    }
 
-		return dataStream.peek(item -> log.info("Fetched Item: {}", item));
-	}
+    // fetches paginated data as stream using PaginationService
+    private @Nonnull Stream<String> fetchPaginatedDataAsStream() {
+        log.info("Fetching paginated data as a stream.");
+
+        // Start from page 0 and continue until all data is fetched
+        Stream<String> dataStream = Stream.iterate(0, page -> page + 1) 
+            .takeWhile(page -> page * PAGE_SIZE < PaginationService.FULL_DATA_SIZE)
+            .flatMap(page -> {
+                // Fetch paginated data for the current page
+                log.info("Fetching data for page {}", page + 1);
+                List<String> pageData = paginationService.getPaginatedData(page + 1, PAGE_SIZE);
+                // Convert the list of data into a stream
+                return pageData.stream();
+            });
+
+        // Log each fetched item and return the stream
+        return dataStream.peek(item -> log.info("Fetched Item: {}", item));
+    }
+
 }
